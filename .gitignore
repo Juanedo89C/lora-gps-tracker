@@ -13,3 +13,5 @@ check_*.py
 restore_*.py
 deploy.py
 deploy_server.py
+audit*.py
+verify_deploy.py

@@ -156,12 +156,15 @@
   .modal-future .section-title { color: #334155; }
 
   /* Telemetry bars in modal */
-  .tele-row { display: flex; flex-direction: column; gap: 3px; margin-bottom: 7px; }
+  .tele-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 9px; }
   .tele-row:last-child { margin-bottom: 0; }
-  .tele-label { font-size: .7rem; color: #94a3b8; display: flex; justify-content: space-between; }
-  .tele-val { font-weight: 600; }
-  .tele-bar-bg { background: #0f172a; border-radius: 3px; height: 5px; overflow: hidden; }
-  .tele-bar { height: 100%; border-radius: 3px; transition: width .4s; }
+  .tele-label { font-size: .7rem; display: flex; justify-content: space-between; align-items: baseline; }
+  .tele-key { color: #64748b; }
+  .tele-raw { color: #64748b; font-size: .65rem; }
+  .tele-pct { font-size: .78rem; font-weight: 700; }
+  .tele-sat { font-size: .78rem; font-weight: 700; }
+  .tele-bar-bg { background: #334155; border-radius: 4px; height: 8px; overflow: hidden; }
+  .tele-bar { height: 100%; border-radius: 4px; transition: width .5s; }
 
   /* Scrollbar */
   ::-webkit-scrollbar { width: 4px; }
@@ -273,7 +276,7 @@
 <script>
   window._mapsReady = function () {
     var s = document.createElement('script');
-    s.src = 'app.js';
+    s.src = 'app.js?v=' + Date.now();
     document.body.appendChild(s);
   };
   (async () => {

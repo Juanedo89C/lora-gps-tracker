@@ -162,37 +162,49 @@ function renderModal() {
             </button>
         `).join('');
 
-    // Telemetry
+    // Telemetry — guard against old cached HTML that may not have this element
     const teleEl = document.getElementById('modal-telemetry-grid');
-    let teleHtml = '';
-    const battery    = d.battery    || 0;
-    const satellites = d.satellites || 0;
-    const rssi       = d.rssi       || 0;
+    if (teleEl) {
+        let teleHtml = '';
+        const battery    = parseInt(d.battery,    10) || 0;
+        const satellites = parseInt(d.satellites, 10) || 0;
+        const rssi       = parseInt(d.rssi,       10) || 0;
 
-    if (battery > 0) {
-        const vbat    = battery / 50.0;
-        const pct     = Math.max(0, Math.min(100, Math.round((vbat - 3.0) / (4.2 - 3.0) * 100)));
-        const barClr  = pct > 50 ? '#22c55e' : pct > 20 ? '#f59e0b' : '#ef4444';
-        teleHtml += `<div class="tele-row">
-            <div class="tele-label"><span>Battery</span><span class="tele-val">${vbat.toFixed(2)} V &middot; ${pct}%</span></div>
-            <div class="tele-bar-bg"><div class="tele-bar" style="width:${pct}%;background:${barClr}"></div></div>
-        </div>`;
+        if (battery > 0) {
+            const vbat   = battery / 50.0;
+            const pct    = Math.max(0, Math.min(100, Math.round((vbat - 3.0) / (4.2 - 3.0) * 100)));
+            const barClr = pct > 50 ? '#22c55e' : pct > 20 ? '#f59e0b' : '#ef4444';
+            teleHtml += `<div class="tele-row">
+                <div class="tele-label">
+                    <span class="tele-key">Battery <span class="tele-raw">${vbat.toFixed(2)} V</span></span>
+                    <span class="tele-pct" style="color:${barClr}">${pct}%</span>
+                </div>
+                <div class="tele-bar-bg"><div class="tele-bar" style="width:${pct}%;background:${barClr}"></div></div>
+            </div>`;
+        }
+        if (satellites > 0) {
+            const satClr = satellites >= 4 ? '#22c55e' : satellites >= 2 ? '#f59e0b' : '#ef4444';
+            teleHtml += `<div class="tele-row">
+                <div class="tele-label">
+                    <span class="tele-key">Satellites</span>
+                    <span class="tele-sat" style="color:${satClr}">${satellites}</span>
+                </div>
+            </div>`;
+        }
+        if (rssi !== 0) {
+            // Scale relative to LoRa sensitivity floor (-137 dBm) → 0 dBm = 100%, -137 dBm = 0%
+            const rssiPct = Math.max(0, Math.min(100, Math.round((rssi + 137) / 137 * 100)));
+            const rssiClr = rssiPct > 60 ? '#22c55e' : rssiPct > 30 ? '#f59e0b' : '#ef4444';
+            teleHtml += `<div class="tele-row">
+                <div class="tele-label">
+                    <span class="tele-key">RSSI <span class="tele-raw">${rssi} dBm</span></span>
+                    <span class="tele-pct" style="color:${rssiClr}">${rssiPct}%</span>
+                </div>
+                <div class="tele-bar-bg"><div class="tele-bar" style="width:${rssiPct}%;background:${rssiClr}"></div></div>
+            </div>`;
+        }
+        teleEl.innerHTML = teleHtml || '<div style="color:#475569;font-size:.75rem">No telemetry yet.</div>';
     }
-    if (satellites > 0) {
-        const satClr = satellites >= 4 ? '#22c55e' : satellites >= 2 ? '#f59e0b' : '#ef4444';
-        teleHtml += `<div class="tele-row">
-            <div class="tele-label"><span>Satellites</span><span class="tele-val" style="color:${satClr}">${satellites}</span></div>
-        </div>`;
-    }
-    if (rssi !== 0) {
-        const rssiPct = Math.max(0, Math.min(100, rssi + 150));
-        const rssiClr = rssiPct > 60 ? '#22c55e' : rssiPct > 30 ? '#f59e0b' : '#ef4444';
-        teleHtml += `<div class="tele-row">
-            <div class="tele-label"><span>RSSI</span><span class="tele-val">${rssi} dBm &middot; ${rssiPct}%</span></div>
-            <div class="tele-bar-bg"><div class="tele-bar" style="width:${rssiPct}%;background:${rssiClr}"></div></div>
-        </div>`;
-    }
-    teleEl.innerHTML = teleHtml || '<div style="color:#475569;font-size:.75rem">No telemetry yet.</div>';
 
     const lm   = lastMessages[devEui];
     const lmEl = document.getElementById('modal-last-msg');
