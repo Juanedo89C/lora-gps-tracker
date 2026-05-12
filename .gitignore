@@ -1,0 +1,14 @@
+node_modules/
+dashboard/tracker.db
+*.db
+*.pyc
+__pycache__/
+watch_*.py
+test_*.py
+debug_*.py
+recent*.py
+post_*.py
+find_*.py
+check_*.py
+restore_*.py
+deploy.py

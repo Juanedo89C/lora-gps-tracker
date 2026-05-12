@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LoRa GPS Tracker</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; display: flex; flex-direction: column; overflow: hidden; }
+  header { background: #1e293b; padding: 12px 20px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #334155; flex-shrink: 0; }
+  header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: .04em; }
+  #conn-badge { font-size: .72rem; padding: 2px 8px; border-radius: 9999px; background: #334155; color: #94a3b8; }
+  #conn-badge.connected { background: #166534; color: #86efac; }
+
+  #map-warning { display: none; background: #7c2d12; border-bottom: 1px solid #c2410c; color: #fed7aa; padding: 8px 20px; font-size: .8rem; flex-shrink: 0; }
+
+  .layout { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+
+  /* Map */
+  #map { flex: 1; }
+
+  /* Sidebar */
+  aside { width: 340px; background: #1e293b; display: flex; flex-direction: column; border-left: 1px solid #334155; overflow: hidden; }
+
+  /* Devices */
+  .section { padding: 12px 14px; border-bottom: 1px solid #334155; }
+  .section-title { font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #64748b; margin-bottom: 8px; }
+  .device-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; gap: 8px; border-bottom: 1px solid #1e3a5f22; }
+  .device-row:last-child { border-bottom: none; }
+  .device-info { display: flex; flex-direction: column; gap: 2px; }
+  .device-name { font-size: .85rem; font-weight: 600; }
+  .device-meta { font-size: .7rem; color: #64748b; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #475569; margin-right: 5px; }
+  .dot.online { background: #22c55e; }
+  .mode-btns { display: flex; gap: 4px; }
+  .mode-btn { font-size: .68rem; padding: 3px 7px; border-radius: 4px; border: 1px solid #334155; background: #0f172a; color: #94a3b8; cursor: pointer; transition: all .15s; }
+  .mode-btn:hover { border-color: #60a5fa; color: #60a5fa; }
+  .mode-btn.active-low    { background: #14532d; border-color: #22c55e; color: #86efac; }
+  .mode-btn.active-medium { background: #854d0e; border-color: #f59e0b; color: #fde68a; }
+  .mode-btn.active-high   { background: #7f1d1d; border-color: #ef4444; color: #fca5a5; }
+
+  /* Messages */
+  .msg-list { flex: 1; overflow-y: auto; padding: 8px 14px; display: flex; flex-direction: column; gap: 6px; }
+  .msg-item { background: #0f172a; border-radius: 6px; padding: 7px 10px; font-size: .78rem; line-height: 1.4; }
+  .msg-item .meta { color: #475569; font-size: .68rem; margin-bottom: 3px; display: flex; justify-content: space-between; }
+  .msg-item.down { border-left: 3px solid #60a5fa; }
+  .msg-item.up   { border-left: 3px solid #22c55e; }
+
+  /* Send form */
+  .send-area { padding: 12px 14px; border-top: 1px solid #334155; display: flex; flex-direction: column; gap: 8px; }
+  .send-row { display: flex; gap: 8px; }
+  select, input[type=text] { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 6px; padding: 7px 10px; font-size: .82rem; outline: none; }
+  select:focus, input[type=text]:focus { border-color: #60a5fa; }
+  select { width: 130px; }
+  input[type=text] { flex: 1; }
+  button.send-btn { background: #2563eb; border: none; color: #fff; border-radius: 6px; padding: 7px 14px; font-size: .82rem; cursor: pointer; white-space: nowrap; }
+  button.send-btn:hover { background: #1d4ed8; }
+  button.send-btn:disabled { background: #334155; color: #64748b; cursor: default; }
+
+  /* History panel */
+  #history-panel { flex-shrink: 0; height: 420px; background: #0f172a; border-top: 1px solid #334155; display: flex; flex-direction: column; }
+  .history-bar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; flex-wrap: wrap; border-bottom: 1px solid #1e293b; background: #1e293b; flex-shrink: 0; }
+  .history-bar .section-title { margin-bottom: 0; }
+  #history-device-sel { width: 160px; }
+  .history-load-btn { background: #2563eb; border: none; color: #fff; border-radius: 6px; padding: 5px 12px; font-size: .78rem; cursor: pointer; }
+  .history-load-btn:hover { background: #1d4ed8; }
+  #history-stats { font-size: .72rem; color: #94a3b8; margin-left: auto; }
+  #history-map { flex: 1; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>LoRa GPS Tracker</h1>
+  <span id="conn-badge">Connecting…</span>
+</header>
+
+<div id="map-warning">⚠ No Google Maps API key configured — set GOOGLE_MAPS_KEY in the service environment.</div>
+
+<div class="layout">
+  <div id="map"></div>
+
+  <aside>
+    <div class="section">
+      <div class="section-title">Devices</div>
+      <div id="device-list">
+        <div style="color:#64748b;font-size:.78rem">No devices seen yet.</div>
+      </div>
+    </div>
+
+    <div class="section-title" style="padding:12px 14px 4px">Messages</div>
+    <div class="msg-list" id="msg-list"></div>
+
+    <div class="send-area">
+      <div class="section-title">Send to device</div>
+      <div class="send-row">
+        <select id="target-device"><option value="">— select —</option></select>
+        <input type="text" id="msg-input" placeholder="Type message…" maxlength="50">
+        <button class="send-btn" id="send-btn" onclick="sendMessage()">Send</button>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<div id="history-panel">
+  <div class="history-bar">
+    <span class="section-title">GPS Track History</span>
+    <select id="history-device-sel"><option value="">— select device —</option></select>
+    <button class="history-load-btn" onclick="loadDeviceHistory()">Load Track</button>
+    <span id="history-stats"></span>
+  </div>
+  <div id="history-map"></div>
+</div>
+
+<script>
+  // Fetch API key, then inject Google Maps script; app.js loads via the callback
+  window._mapsReady = function () {
+    var s = document.createElement('script');
+    s.src = 'app.js';
+    document.body.appendChild(s);
+  };
+  (async () => {
+    var cfg = await fetch('/api/config').then(r => r.json()).catch(() => ({}));
+    var key = cfg.googleMapsKey || '';
+    if (!key) document.getElementById('map-warning').style.display = 'block';
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(key) + '&callback=_mapsReady';
+    document.head.appendChild(s);
+  })();
+</script>
+</body>
+</html>
