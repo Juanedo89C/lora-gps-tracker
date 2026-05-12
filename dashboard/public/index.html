@@ -8,6 +8,7 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
   body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; display: flex; flex-direction: column; overflow: hidden; }
+
   header { background: #1e293b; padding: 12px 20px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #334155; flex-shrink: 0; }
   header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: .04em; }
   #conn-badge { font-size: .72rem; padding: 2px 8px; border-radius: 9999px; background: #334155; color: #94a3b8; }
@@ -15,58 +16,144 @@
 
   #map-warning { display: none; background: #7c2d12; border-bottom: 1px solid #c2410c; color: #fed7aa; padding: 8px 20px; font-size: .8rem; flex-shrink: 0; }
 
+  /* ── Main layout ─────────────────────────────────────────────────────────── */
   .layout { display: flex; flex: 1; min-height: 0; overflow: hidden; }
 
-  /* Map */
-  #map { flex: 1; }
+  /* ── Left sidebar ────────────────────────────────────────────────────────── */
+  aside {
+    width: 300px;
+    background: #1e293b;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #334155;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
 
-  /* Sidebar */
-  aside { width: 340px; background: #1e293b; display: flex; flex-direction: column; border-left: 1px solid #334155; overflow: hidden; }
-
-  /* Devices */
-  .section { padding: 12px 14px; border-bottom: 1px solid #334155; }
-  .section-title { font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #64748b; margin-bottom: 8px; }
-  .device-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; gap: 8px; border-bottom: 1px solid #1e3a5f22; }
-  .device-row:last-child { border-bottom: none; }
-  .device-info { display: flex; flex-direction: column; gap: 2px; }
-  .device-name { font-size: .85rem; font-weight: 600; }
-  .device-meta { font-size: .7rem; color: #64748b; }
-  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #475569; margin-right: 5px; }
-  .dot.online { background: #22c55e; }
-  .mode-btns { display: flex; gap: 4px; }
-  .mode-btn { font-size: .68rem; padding: 3px 7px; border-radius: 4px; border: 1px solid #334155; background: #0f172a; color: #94a3b8; cursor: pointer; transition: all .15s; }
-  .mode-btn:hover { border-color: #60a5fa; color: #60a5fa; }
-  .mode-btn.active-low    { background: #14532d; border-color: #22c55e; color: #86efac; }
-  .mode-btn.active-medium { background: #854d0e; border-color: #f59e0b; color: #fde68a; }
-  .mode-btn.active-high   { background: #7f1d1d; border-color: #ef4444; color: #fca5a5; }
-
-  /* Messages */
-  .msg-list { flex: 1; overflow-y: auto; padding: 8px 14px; display: flex; flex-direction: column; gap: 6px; }
+  /* Messages (top, fills remaining space) */
+  .msg-section { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  .msg-title { font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #64748b; padding: 12px 14px 4px; flex-shrink: 0; }
+  .msg-list { flex: 1; overflow-y: auto; padding: 6px 12px 8px; display: flex; flex-direction: column; gap: 5px; }
   .msg-item { background: #0f172a; border-radius: 6px; padding: 7px 10px; font-size: .78rem; line-height: 1.4; }
   .msg-item .meta { color: #475569; font-size: .68rem; margin-bottom: 3px; display: flex; justify-content: space-between; }
   .msg-item.down { border-left: 3px solid #60a5fa; }
   .msg-item.up   { border-left: 3px solid #22c55e; }
 
-  /* Send form */
-  .send-area { padding: 12px 14px; border-top: 1px solid #334155; display: flex; flex-direction: column; gap: 8px; }
-  .send-row { display: flex; gap: 8px; }
-  select, input[type=text] { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 6px; padding: 7px 10px; font-size: .82rem; outline: none; }
+  /* Devices (bottom of sidebar, fixed height) */
+  .devices-section { border-top: 1px solid #334155; flex-shrink: 0; max-height: 210px; overflow-y: auto; }
+  .section { padding: 10px 12px; }
+  .section-title { font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #64748b; margin-bottom: 8px; }
+  .device-row { display: flex; align-items: center; gap: 8px; padding: 7px 6px; border-radius: 5px; cursor: pointer; transition: background .1s; border-bottom: 1px solid #1e3a5f22; }
+  .device-row:last-child { border-bottom: none; }
+  .device-row:hover { background: #0f172a; }
+  .device-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .device-name { font-size: .85rem; font-weight: 600; }
+  .device-meta { font-size: .68rem; color: #64748b; }
+  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #475569; margin-right: 4px; flex-shrink: 0; }
+  .dot.online { background: #22c55e; }
+  .device-chevron { color: #475569; font-size: .9rem; flex-shrink: 0; }
+
+  /* ── Map area ────────────────────────────────────────────────────────────── */
+  #map-container { flex: 1; position: relative; }
+  #map { position: absolute; inset: 0; }
+
+  /* Fullscreen button overlay */
+  .fs-btn {
+    position: absolute;
+    top: 9px; right: 9px;
+    z-index: 10;
+    background: rgba(30,41,59,.92);
+    border: 1px solid #334155;
+    color: #94a3b8;
+    border-radius: 6px;
+    padding: 5px 7px;
+    cursor: pointer;
+    line-height: 1;
+    transition: all .15s;
+  }
+  .fs-btn:hover { color: #e2e8f0; border-color: #60a5fa; }
+  .fs-btn svg { display: block; }
+
+  /* Persistent last-message overlay on map */
+  #map-msg-overlay {
+    display: none;
+    position: absolute;
+    bottom: 24px; left: 12px;
+    z-index: 10;
+    background: rgba(15,23,42,.88);
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 8px 12px;
+    max-width: 260px;
+    backdrop-filter: blur(4px);
+  }
+  #map-msg-overlay .om-meta { color: #64748b; font-size: .65rem; display: flex; gap: 8px; margin-bottom: 3px; }
+  #map-msg-overlay .om-body { font-size: .8rem; color: #e2e8f0; word-break: break-word; }
+
+  /* ── History panel ───────────────────────────────────────────────────────── */
+  #history-panel { flex-shrink: 0; height: 240px; background: #0f172a; border-top: 1px solid #334155; display: flex; flex-direction: column; }
+  #history-panel:fullscreen { height: 100vh; }
+  .history-bar { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid #1e293b; background: #1e293b; flex-shrink: 0; flex-wrap: wrap; }
+  .history-bar .section-title { margin-bottom: 0; }
+  #history-device-sel { width: 145px; }
+  .history-load-btn { background: #2563eb; border: none; color: #fff; border-radius: 6px; padding: 4px 10px; font-size: .75rem; cursor: pointer; }
+  .history-load-btn:hover { background: #1d4ed8; }
+  .history-fs-btn { background: transparent; border: 1px solid #334155; color: #64748b; border-radius: 5px; padding: 4px 7px; cursor: pointer; line-height: 1; }
+  .history-fs-btn:hover { color: #e2e8f0; border-color: #60a5fa; }
+  #history-stats { font-size: .7rem; color: #94a3b8; margin-left: auto; }
+  #history-map-container { flex: 1; position: relative; }
+  #history-map { position: absolute; inset: 0; }
+
+  /* ── Device detail panel (slide-in from right) ───────────────────────────── */
+  .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 150; }
+  .modal-backdrop.open { display: block; }
+
+  #device-modal {
+    position: fixed;
+    top: 0; right: -380px;
+    width: 340px;
+    height: 100%;
+    background: #1e293b;
+    border-left: 1px solid #334155;
+    z-index: 200;
+    transition: right .24s ease;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  #device-modal.open { right: 0; }
+
+  .modal-header { display: flex; align-items: flex-start; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid #334155; flex-shrink: 0; }
+  .modal-dev-name { font-size: .95rem; font-weight: 600; margin-bottom: 2px; }
+  .modal-dev-eui  { font-size: .68rem; color: #64748b; }
+  .modal-close    { background: transparent; border: 1px solid #334155; color: #94a3b8; border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: .85rem; }
+  .modal-close:hover { color: #e2e8f0; border-color: #60a5fa; }
+  .modal-section  { padding: 14px 18px; border-bottom: 1px solid #0f172a; }
+  .modal-section .section-title { margin-bottom: 10px; }
+
+  /* Power mode buttons in modal */
+  .mode-btns { display: flex; gap: 6px; }
+  .mode-btn { flex: 1; font-size: .78rem; padding: 6px 4px; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: #94a3b8; cursor: pointer; transition: all .15s; }
+  .mode-btn:hover { border-color: #60a5fa; color: #60a5fa; }
+  .mode-btn.active-low    { background: #14532d; border-color: #22c55e; color: #86efac; }
+  .mode-btn.active-medium { background: #854d0e; border-color: #f59e0b; color: #fde68a; }
+  .mode-btn.active-high   { background: #7f1d1d; border-color: #ef4444; color: #fca5a5; }
+
+  /* Chat in modal */
+  select, input[type=text] { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 6px; padding: 7px 10px; font-size: .82rem; outline: none; width: 100%; }
   select:focus, input[type=text]:focus { border-color: #60a5fa; }
-  select { width: 130px; }
-  input[type=text] { flex: 1; }
+  .modal-send-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .modal-send-row input { flex: 1; width: auto; }
   button.send-btn { background: #2563eb; border: none; color: #fff; border-radius: 6px; padding: 7px 14px; font-size: .82rem; cursor: pointer; white-space: nowrap; }
   button.send-btn:hover { background: #1d4ed8; }
   button.send-btn:disabled { background: #334155; color: #64748b; cursor: default; }
 
-  /* History panel */
-  #history-panel { flex-shrink: 0; height: 420px; background: #0f172a; border-top: 1px solid #334155; display: flex; flex-direction: column; }
-  .history-bar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; flex-wrap: wrap; border-bottom: 1px solid #1e293b; background: #1e293b; flex-shrink: 0; }
-  .history-bar .section-title { margin-bottom: 0; }
-  #history-device-sel { width: 160px; }
-  .history-load-btn { background: #2563eb; border: none; color: #fff; border-radius: 6px; padding: 5px 12px; font-size: .78rem; cursor: pointer; }
-  .history-load-btn:hover { background: #1d4ed8; }
-  #history-stats { font-size: .72rem; color: #94a3b8; margin-left: auto; }
-  #history-map { flex: 1; }
+  .modal-last-msg { background: #0f172a; border-radius: 6px; padding: 8px 10px; font-size: .78rem; line-height: 1.4; min-height: 38px; }
+  .modal-last-msg .meta { color: #475569; font-size: .68rem; margin-bottom: 3px; display: flex; justify-content: space-between; }
+  .modal-last-msg.down { border-left: 3px solid #60a5fa; }
+  .modal-last-msg.up   { border-left: 3px solid #22c55e; }
+
+  .modal-future .section-title { color: #334155; }
 
   /* Scrollbar */
   ::-webkit-scrollbar { width: 4px; }
@@ -84,42 +171,93 @@
 <div id="map-warning">⚠ No Google Maps API key configured — set GOOGLE_MAPS_KEY in the service environment.</div>
 
 <div class="layout">
-  <div id="map"></div>
 
+  <!-- LEFT sidebar: messages (top) + devices (bottom) -->
   <aside>
-    <div class="section">
-      <div class="section-title">Devices</div>
-      <div id="device-list">
-        <div style="color:#64748b;font-size:.78rem">No devices seen yet.</div>
-      </div>
+    <div class="msg-section">
+      <div class="msg-title">Messages</div>
+      <div class="msg-list" id="msg-list"></div>
     </div>
 
-    <div class="section-title" style="padding:12px 14px 4px">Messages</div>
-    <div class="msg-list" id="msg-list"></div>
-
-    <div class="send-area">
-      <div class="section-title">Send to device</div>
-      <div class="send-row">
-        <select id="target-device"><option value="">— select —</option></select>
-        <input type="text" id="msg-input" placeholder="Type message…" maxlength="50">
-        <button class="send-btn" id="send-btn" onclick="sendMessage()">Send</button>
+    <div class="devices-section">
+      <div class="section">
+        <div class="section-title">Devices</div>
+        <div id="device-list">
+          <div style="color:#64748b;font-size:.78rem">No devices seen yet.</div>
+        </div>
       </div>
     </div>
   </aside>
+
+  <!-- Main map -->
+  <div id="map-container">
+    <div id="map"></div>
+    <button class="fs-btn" onclick="toggleFullscreen('map-container')" title="Toggle fullscreen">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6">
+        <path d="M1 4.5V1h3.5M9.5 1H13v3.5M13 9.5V13H9.5M4.5 13H1V9.5"/>
+      </svg>
+    </button>
+    <div id="map-msg-overlay">
+      <div class="om-meta">
+        <span id="om-dir"></span>
+        <span id="om-device"></span>
+        <span id="om-time"></span>
+      </div>
+      <div class="om-body" id="om-body"></div>
+    </div>
+  </div>
 </div>
 
+<!-- History panel -->
 <div id="history-panel">
   <div class="history-bar">
     <span class="section-title">GPS Track History</span>
     <select id="history-device-sel"><option value="">— select device —</option></select>
     <button class="history-load-btn" onclick="loadDeviceHistory()">Load Track</button>
+    <button class="history-fs-btn" onclick="toggleFullscreen('history-panel')" title="Toggle fullscreen">
+      <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6">
+        <path d="M1 4.5V1h3.5M9.5 1H13v3.5M13 9.5V13H9.5M4.5 13H1V9.5"/>
+      </svg>
+    </button>
     <span id="history-stats"></span>
   </div>
-  <div id="history-map"></div>
+  <div id="history-map-container">
+    <div id="history-map"></div>
+  </div>
+</div>
+
+<!-- Device detail panel (slide-in from right) -->
+<div class="modal-backdrop" id="modal-backdrop" onclick="closeDeviceModal()"></div>
+<div id="device-modal">
+  <div class="modal-header">
+    <div>
+      <div class="modal-dev-name" id="modal-dev-name"></div>
+      <div class="modal-dev-eui"  id="modal-dev-eui"></div>
+    </div>
+    <button class="modal-close" onclick="closeDeviceModal()">✕</button>
+  </div>
+
+  <div class="modal-section">
+    <div class="section-title">Power Mode</div>
+    <div class="mode-btns" id="modal-mode-btns"></div>
+  </div>
+
+  <div class="modal-section">
+    <div class="section-title">Chat</div>
+    <div class="modal-send-row">
+      <input type="text" id="modal-msg-input" placeholder="Message (max 50 chars)" maxlength="50">
+      <button class="send-btn" id="modal-send-btn" onclick="sendFromModal()">Send</button>
+    </div>
+    <div class="modal-last-msg" id="modal-last-msg">No messages yet.</div>
+  </div>
+
+  <div class="modal-section modal-future">
+    <div class="section-title">More options</div>
+    <div style="font-size:.75rem;padding-top:4px;color:#334155">Coming soon…</div>
+  </div>
 </div>
 
 <script>
-  // Fetch API key, then inject Google Maps script; app.js loads via the callback
   window._mapsReady = function () {
     var s = document.createElement('script');
     s.src = 'app.js';

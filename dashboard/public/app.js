@@ -73,15 +73,12 @@ const deviceData = {};
 const MODE_LABELS = { 1: 'low', 2: 'medium', 3: 'high' };
 
 function renderDevices() {
-    const el       = document.getElementById('device-list');
-    const sel      = document.getElementById('target-device');
-    const histSel  = document.getElementById('history-device-sel');
-    const selected = sel.value;
+    const el      = document.getElementById('device-list');
+    const histSel = document.getElementById('history-device-sel');
 
     const devs = Object.values(deviceData);
     if (devs.length === 0) {
         el.innerHTML = '<div style="color:#64748b;font-size:.78rem">No devices seen yet.</div>';
-        sel.innerHTML = '<option value="">— select —</option>';
         histSel.innerHTML = '<option value="">— select device —</option>';
         return;
     }
@@ -90,30 +87,21 @@ function renderDevices() {
         const now     = Math.floor(Date.now() / 1000);
         const age     = now - (d.last_seen || 0);
         const online  = age < 120;
-        const modeStr = MODE_LABELS[d.power_mode] || 'medium';
         const color   = getDeviceColor(d.device_eui);
+        const modeStr = MODE_LABELS[d.power_mode] || 'medium';
         return `
-        <div class="device-row">
+        <div class="device-row" onclick="openDeviceModal('${d.device_eui}')">
           <div class="device-info">
             <div class="device-name">
               <span class="dot ${online ? 'online' : ''}"></span>
               <span style="color:${color}">${d.name || d.device_eui}</span>
             </div>
-            <div class="device-meta">${d.device_eui} · ${age < 3600 ? age + 's ago' : 'offline'}</div>
+            <div class="device-meta">${modeStr} · ${age < 3600 ? age + 's ago' : 'offline'}</div>
           </div>
-          <div class="mode-btns">
-            ${['low', 'medium', 'high'].map(m => `
-              <button class="mode-btn ${modeStr === m ? 'active-' + m : ''}"
-                      onclick="setPowerMode('${d.device_eui}','${m}')">${m[0].toUpperCase()}</button>
-            `).join('')}
-          </div>
+          <span class="device-chevron">›</span>
         </div>`;
     }).join('');
 
-    const devOpts = devs.map(d =>
-        `<option value="${d.device_eui}" ${d.device_eui === selected ? 'selected' : ''}>${d.name || d.device_eui}</option>`
-    ).join('');
-    sel.innerHTML     = '<option value="">— select —</option>' + devOpts;
     histSel.innerHTML = '<option value="">— select device —</option>' +
         devs.map(d => `<option value="${d.device_eui}">${d.name || d.device_eui}</option>`).join('');
 }
@@ -129,8 +117,62 @@ function upsertDevice(info) {
     renderDevices();
 }
 
+// ─── Device detail modal ──────────────────────────────────────────────────────
+let currentModalEui = null;
+const lastMessages  = {};
+
+function openDeviceModal(devEui) {
+    currentModalEui = devEui;
+    renderModal();
+    document.getElementById('device-modal').classList.add('open');
+    document.getElementById('modal-backdrop').classList.add('open');
+    setTimeout(() => document.getElementById('modal-msg-input').focus(), 280);
+}
+
+function closeDeviceModal() {
+    currentModalEui = null;
+    document.getElementById('device-modal').classList.remove('open');
+    document.getElementById('modal-backdrop').classList.remove('open');
+}
+
+function renderModal() {
+    if (!currentModalEui) return;
+    const devEui  = currentModalEui;
+    const d       = deviceData[devEui];
+    if (!d) return;
+
+    const now     = Math.floor(Date.now() / 1000);
+    const age     = now - (d.last_seen || 0);
+    const online  = age < 120;
+    const color   = getDeviceColor(devEui);
+    const modeStr = MODE_LABELS[d.power_mode] || 'medium';
+
+    document.getElementById('modal-dev-name').innerHTML =
+        `<span class="dot ${online ? 'online' : ''}"></span><span style="color:${color}">${d.name || devEui}</span>`;
+    document.getElementById('modal-dev-eui').textContent = devEui;
+
+    document.getElementById('modal-mode-btns').innerHTML =
+        ['low', 'medium', 'high'].map(m => `
+            <button class="mode-btn ${modeStr === m ? 'active-' + m : ''}"
+                    onclick="setPowerMode('${devEui}','${m}')">
+                ${m[0].toUpperCase() + m.slice(1)}
+            </button>
+        `).join('');
+
+    const lm   = lastMessages[devEui];
+    const lmEl = document.getElementById('modal-last-msg');
+    if (lm) {
+        const time = new Date(lm.ts).toLocaleTimeString();
+        lmEl.className = 'modal-last-msg ' + lm.direction;
+        lmEl.innerHTML = `<div class="meta"><span>${lm.direction === 'up' ? '↑ From device' : '↓ To device'}</span><span>${time}</span></div><div>${escHtml(lm.body)}</div>`;
+    } else {
+        lmEl.className = 'modal-last-msg';
+        lmEl.textContent = 'No messages yet.';
+    }
+}
+
 // ─── Message list UI ─────────────────────────────────────────────────────────
-function addMessage(devEui, direction, body, tsMs) {
+function addMessage(devEui, direction, body, tsMs, skipOverlay = false) {
     const el   = document.getElementById('msg-list');
     const time = new Date(tsMs).toLocaleTimeString();
     const name = deviceData[devEui]?.name || devEui;
@@ -144,44 +186,58 @@ function addMessage(devEui, direction, body, tsMs) {
         <div>${escHtml(body)}</div>`;
     el.prepend(item);
     while (el.children.length > 100) el.removeChild(el.lastChild);
+
+    // Track last message per device and update modal if open
+    lastMessages[devEui] = { direction, body, ts: tsMs };
+    if (currentModalEui === devEui) renderModal();
+
+    // Update persistent map overlay (skip for historical bulk-load)
+    if (!skipOverlay) {
+        document.getElementById('om-dir').textContent    = direction === 'up' ? '↑' : '↓';
+        document.getElementById('om-device').textContent = name;
+        document.getElementById('om-time').textContent   = time;
+        document.getElementById('om-body').textContent   = body;
+        document.getElementById('map-msg-overlay').style.display = 'block';
+    }
 }
 
 function escHtml(s) {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-// ─── Send message ────────────────────────────────────────────────────────────
-async function sendMessage() {
-    const devEui  = document.getElementById('target-device').value;
-    const message = document.getElementById('msg-input').value.trim();
-    if (!devEui || !message) return;
+// ─── Send message from modal ──────────────────────────────────────────────────
+async function sendFromModal() {
+    if (!currentModalEui) return;
+    const input   = document.getElementById('modal-msg-input');
+    const message = input.value.trim();
+    if (!message) return;
 
-    const btn = document.getElementById('send-btn');
-    btn.disabled = true;
+    const btn = document.getElementById('modal-send-btn');
+    btn.disabled    = true;
     btn.textContent = 'Sending…';
 
     try {
-        const res = await fetch('/api/downlink', {
+        const res  = await fetch('/api/downlink', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ devEui, message }),
+            body:    JSON.stringify({ devEui: currentModalEui, message }),
         });
         const data = await res.json();
         if (data.ok) {
-            document.getElementById('msg-input').value = '';
+            input.value = '';
         } else {
             alert('Error: ' + (data.error || 'unknown'));
         }
     } catch (e) {
         alert('Network error: ' + e.message);
     } finally {
-        btn.disabled = false;
+        btn.disabled    = false;
         btn.textContent = 'Send';
     }
 }
 
-document.getElementById('msg-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') sendMessage();
+document.getElementById('modal-msg-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') sendFromModal();
 });
 
 // ─── Set power mode ──────────────────────────────────────────────────────────
@@ -190,31 +246,49 @@ const MODE_IDS = { low: 1, medium: 2, high: 3 };
 async function setPowerMode(devEui, mode) {
     const prevMode = deviceData[devEui]?.power_mode;
 
-    // Optimistic update — show selection immediately
     if (deviceData[devEui]) {
         deviceData[devEui].power_mode = MODE_IDS[mode];
         renderDevices();
+        if (currentModalEui === devEui) renderModal();
     }
 
     try {
-        const res = await fetch('/api/power-mode', {
+        const res  = await fetch('/api/power-mode', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ devEui, mode }),
         });
         const data = await res.json();
         if (!data.ok) {
-            // Revert on server error
             if (deviceData[devEui]) deviceData[devEui].power_mode = prevMode;
             renderDevices();
+            if (currentModalEui === devEui) renderModal();
             alert('Error: ' + (data.error || 'unknown'));
         }
     } catch (e) {
         if (deviceData[devEui]) deviceData[devEui].power_mode = prevMode;
         renderDevices();
+        if (currentModalEui === devEui) renderModal();
         alert('Network error: ' + e.message);
     }
 }
+
+// ─── Fullscreen toggle ────────────────────────────────────────────────────────
+function toggleFullscreen(containerId) {
+    const el = document.getElementById(containerId);
+    if (!document.fullscreenElement) {
+        el.requestFullscreen().catch(err => console.warn('Fullscreen:', err));
+    } else {
+        document.exitFullscreen();
+    }
+}
+
+document.addEventListener('fullscreenchange', () => {
+    setTimeout(() => {
+        google.maps.event.trigger(mainMap, 'resize');
+        google.maps.event.trigger(historyMap, 'resize');
+    }, 150);
+});
 
 // ─── WebSocket for real-time updates ─────────────────────────────────────────
 const badge = document.getElementById('conn-badge');
@@ -251,6 +325,7 @@ function connect() {
             if (deviceData[devEui]) {
                 deviceData[devEui].power_mode = mode;
                 renderDevices();
+                if (currentModalEui === devEui) renderModal();
             }
         }
     };
@@ -270,8 +345,20 @@ async function loadInitialData() {
         pts.forEach(p => addGpsPoint(d.device_eui, p.lat, p.lon));
     }
 
+    // Load message history without updating the map overlay for each item
     const msgs = await fetch('/api/messages').then(r => r.json()).catch(() => []);
-    msgs.reverse().forEach(m => addMessage(m.device_eui, m.direction, m.body, m.ts * 1000));
+    msgs.reverse().forEach(m => addMessage(m.device_eui, m.direction, m.body, m.ts * 1000, true));
+
+    // Show the single most-recent message in the overlay (msgs comes newest-first from API)
+    if (msgs.length > 0) {
+        const latest = msgs[0];
+        const name   = deviceData[latest.device_eui]?.name || latest.device_eui;
+        document.getElementById('om-dir').textContent    = latest.direction === 'up' ? '↑' : '↓';
+        document.getElementById('om-device').textContent = name;
+        document.getElementById('om-time').textContent   = new Date(latest.ts * 1000).toLocaleTimeString();
+        document.getElementById('om-body').textContent   = latest.body;
+        document.getElementById('map-msg-overlay').style.display = 'block';
+    }
 }
 
 // ─── Auto-refresh every 5 seconds ────────────────────────────────────────────
@@ -279,6 +366,7 @@ setInterval(async () => {
     const devs = await fetch('/api/devices').then(r => r.json()).catch(() => []);
     devs.forEach(d => { deviceData[d.device_eui] = { ...deviceData[d.device_eui], ...d }; });
     renderDevices();
+    if (currentModalEui) renderModal();
 }, 5000);
 
 // ─── GPS Track History panel ──────────────────────────────────────────────────
