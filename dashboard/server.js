@@ -304,6 +304,18 @@ app.post('/api/downlink', async (req, res) => {
     }
 });
 
+// Reboot a device
+app.post('/api/reboot', async (req, res) => {
+    const { devEui } = req.body;
+    if (!devEui) return res.status(400).json({ error: 'devEui required' });
+    try {
+        await sendDownlink(devEui, 12, [0x30]);
+        res.json({ ok: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // Set power mode on a device
 const POWER_MODES = { low: 0x01, medium: 0x02, high: 0x03 };
 app.post('/api/power-mode', async (req, res) => {

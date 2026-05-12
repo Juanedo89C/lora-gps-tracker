@@ -155,6 +155,19 @@
 
   .modal-future .section-title { color: #334155; }
 
+  /* Reboot button */
+  .reboot-btn { width: 100%; background: #450a0a; border: 1px solid #dc2626; color: #fca5a5; border-radius: 6px; padding: 8px 14px; font-size: .82rem; cursor: pointer; transition: all .15s; }
+  .reboot-btn:hover { background: #7f1d1d; border-color: #ef4444; }
+  .reboot-btn:disabled { background: #1e293b; border-color: #334155; color: #475569; cursor: default; }
+
+  /* LoRa status badge */
+  .lora-status { font-size: .65rem; font-weight: 700; padding: 1px 5px; border-radius: 4px; }
+  .lora-status.connected { background: #14532d; color: #86efac; }
+  .lora-status.joining   { background: #451a03; color: #fcd34d; }
+
+  /* Last-message line in device row */
+  .device-last-msg { font-size: .67rem; color: #60a5fa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-top: 1px; }
+
   /* Telemetry bars in modal */
   .tele-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 9px; }
   .tele-row:last-child { margin-bottom: 0; }
@@ -244,8 +257,13 @@
     <div>
       <div class="modal-dev-name" id="modal-dev-name"></div>
       <div class="modal-dev-eui"  id="modal-dev-eui"></div>
+      <span class="lora-status joining" id="modal-lora-status" style="margin-top:4px;display:inline-block">LoRa Joining...</span>
     </div>
     <button class="modal-close" onclick="closeDeviceModal()">✕</button>
+  </div>
+
+  <div class="modal-section">
+    <button class="reboot-btn" id="modal-reboot-btn" onclick="rebootDevice()">⟳ Reboot Device</button>
   </div>
 
   <div class="modal-section">

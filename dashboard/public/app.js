@@ -84,11 +84,16 @@ function renderDevices() {
     }
 
     el.innerHTML = devs.map(d => {
-        const now     = Math.floor(Date.now() / 1000);
-        const age     = now - (d.last_seen || 0);
-        const online  = age < 120;
-        const color   = getDeviceColor(d.device_eui);
-        const modeStr = MODE_LABELS[d.power_mode] || 'medium';
+        const now           = Math.floor(Date.now() / 1000);
+        const age           = now - (d.last_seen || 0);
+        const online        = age < 120;
+        const loraConnected = d.last_seen > 0 && age < 60;
+        const color         = getDeviceColor(d.device_eui);
+        const modeStr       = MODE_LABELS[d.power_mode] || 'medium';
+        const lm            = lastMessages[d.device_eui];
+        const lastMsgHtml   = lm
+            ? `<div class="device-last-msg">${lm.direction === 'down' ? '↓' : '↑'} ${escHtml(lm.body)}</div>`
+            : '';
         return `
         <div class="device-row" onclick="openDeviceModal('${d.device_eui}')">
           <div class="device-info">
@@ -96,7 +101,8 @@ function renderDevices() {
               <span class="dot ${online ? 'online' : ''}"></span>
               <span style="color:${color}">${d.name || d.device_eui}</span>
             </div>
-            <div class="device-meta">${modeStr} · ${age < 3600 ? age + 's ago' : 'offline'}</div>
+            <div class="device-meta">${modeStr} · <span class="lora-status ${loraConnected ? 'connected' : 'joining'}">${loraConnected ? 'Connected' : 'Joining...'}</span> · ${age < 3600 ? age + 's ago' : 'offline'}</div>
+            ${lastMsgHtml}
           </div>
           <span class="device-chevron">›</span>
         </div>`;
@@ -144,15 +150,21 @@ function renderModal() {
     const d       = deviceData[devEui];
     if (!d) return;
 
-    const now     = Math.floor(Date.now() / 1000);
-    const age     = now - (d.last_seen || 0);
-    const online  = age < 120;
-    const color   = getDeviceColor(devEui);
-    const modeStr = MODE_LABELS[d.power_mode] || 'medium';
+    const now           = Math.floor(Date.now() / 1000);
+    const age           = now - (d.last_seen || 0);
+    const online        = age < 120;
+    const loraConnected = d.last_seen > 0 && age < 60;
+    const color         = getDeviceColor(devEui);
+    const modeStr       = MODE_LABELS[d.power_mode] || 'medium';
 
     document.getElementById('modal-dev-name').innerHTML =
         `<span class="dot ${online ? 'online' : ''}"></span><span style="color:${color}">${d.name || devEui}</span>`;
     document.getElementById('modal-dev-eui').textContent = devEui;
+    const loraEl = document.getElementById('modal-lora-status');
+    if (loraEl) {
+        loraEl.className = `lora-status ${loraConnected ? 'connected' : 'joining'}`;
+        loraEl.textContent = loraConnected ? 'LoRa Connected' : 'LoRa Joining...';
+    }
 
     document.getElementById('modal-mode-btns').innerHTML =
         ['low', 'medium', 'high'].map(m => `
@@ -250,6 +262,30 @@ function addMessage(devEui, direction, body, tsMs, skipOverlay = false) {
 
 function escHtml(s) {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ─── Reboot device from modal ─────────────────────────────────────────────────
+async function rebootDevice() {
+    if (!currentModalEui) return;
+    const btn = document.getElementById('modal-reboot-btn');
+    btn.disabled    = true;
+    btn.textContent = 'Rebooting…';
+    try {
+        const res  = await fetch('/api/reboot', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ devEui: currentModalEui }),
+        });
+        const data = await res.json();
+        if (!data.ok) alert('Error: ' + (data.error || 'unknown'));
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    } finally {
+        setTimeout(() => {
+            btn.disabled    = false;
+            btn.textContent = '⟳ Reboot Device';
+        }, 3000);
+    }
 }
 
 // ─── Send message from modal ──────────────────────────────────────────────────
