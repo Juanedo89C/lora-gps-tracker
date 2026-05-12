@@ -134,6 +134,9 @@ function handleUplink(topic, raw) {
     stmtUpsertDevice.run(devEui, name, 2);
     stmtUpdateTelemetry.run(rssi, battery, satellites, devEui);
 
+    // Always broadcast telemetry so the dashboard updates satellite count without waiting for a GPS fix
+    broadcast('telemetry', { devEui, name, rssi, battery, satellites });
+
     // GPS data
     if (obj.latitude != null && obj.longitude != null) {
         const lat = obj.latitude;
@@ -298,6 +301,48 @@ app.post('/api/downlink', async (req, res) => {
         await sendDownlink(devEui, 10, bytes);
         stmtInsertMsg.run(devEui, 'down', message);
         broadcast('message', { devEui, direction: 'down', body: message, ts: Date.now() });
+        res.json({ ok: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Flush ChirpStack downlink queue for a device (gRPC-web)
+app.post('/api/flush-queue', async (req, res) => {
+    const { devEui } = req.body;
+    if (!devEui) return res.status(400).json({ error: 'devEui required' });
+    try {
+        // FlushDeviceQueueItems: message has dev_eui field (field 1)
+        const msg  = pbString(1, devEui);
+        const body = grpcWebFrame(msg);
+        const r = await fetch(`${CONFIG.chirpstackUrl}/api.DeviceQueueService/Flush`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/grpc-web+proto',
+                'authorization': `Bearer ${CONFIG.chirpstackToken}`,
+                'x-grpc-web': '1',
+            },
+            body,
+        });
+        const buf = Buffer.from(await r.arrayBuffer());
+        // Check for gRPC error in trailer
+        let offset = 0;
+        while (offset + 5 <= buf.length) {
+            const flags = buf[offset], frameLen = buf.readUInt32BE(offset + 1);
+            offset += 5;
+            if (offset + frameLen > buf.length) break;
+            if (flags & 0x80) {
+                const trailers = {};
+                buf.slice(offset, offset + frameLen).toString('utf8').split(/\r?\n/).forEach(l => {
+                    const c = l.indexOf(':');
+                    if (c > 0) trailers[l.slice(0,c).trim().toLowerCase()] = l.slice(c+1).trim();
+                });
+                if (trailers['grpc-status'] && trailers['grpc-status'] !== '0')
+                    throw new Error(`gRPC ${trailers['grpc-status']}: ${decodeURIComponent(trailers['grpc-message']||'')}`);
+            }
+            offset += frameLen;
+        }
+        console.log(`[flush-queue] ${devEui} OK`);
         res.json({ ok: true });
     } catch (e) {
         res.status(500).json({ error: e.message });

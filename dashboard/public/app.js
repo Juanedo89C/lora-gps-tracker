@@ -166,11 +166,17 @@ function renderModal() {
         loraEl.textContent = loraConnected ? 'LoRa Connected' : 'LoRa Joining...';
     }
 
+    const MODE_DESC = {
+        low:    'GPS 10min · TX 10s',
+        medium: 'GPS 3min · TX 3s',
+        high:   'GPS 10s · TX 3s',
+    };
     document.getElementById('modal-mode-btns').innerHTML =
         ['low', 'medium', 'high'].map(m => `
             <button class="mode-btn ${modeStr === m ? 'active-' + m : ''}"
                     onclick="setPowerMode('${devEui}','${m}')">
                 ${m[0].toUpperCase() + m.slice(1)}
+                <span class="mode-desc">${MODE_DESC[m]}</span>
             </button>
         `).join('');
 
@@ -194,7 +200,7 @@ function renderModal() {
                 <div class="tele-bar-bg"><div class="tele-bar" style="width:${pct}%;background:${barClr}"></div></div>
             </div>`;
         }
-        if (satellites > 0) {
+        {
             const satClr = satellites >= 4 ? '#22c55e' : satellites >= 2 ? '#f59e0b' : '#ef4444';
             teleHtml += `<div class="tele-row">
                 <div class="tele-label">
@@ -204,8 +210,8 @@ function renderModal() {
             </div>`;
         }
         if (rssi !== 0) {
-            // Scale relative to LoRa sensitivity floor (-137 dBm) → 0 dBm = 100%, -137 dBm = 0%
-            const rssiPct = Math.max(0, Math.min(100, Math.round((rssi + 137) / 137 * 100)));
+            // -30 dBm = 100%, -110 dBm = 0%
+            const rssiPct = Math.max(0, Math.min(100, Math.round((rssi + 110) / 80 * 100)));
             const rssiClr = rssiPct > 60 ? '#22c55e' : rssiPct > 30 ? '#f59e0b' : '#ef4444';
             teleHtml += `<div class="tele-row">
                 <div class="tele-label">
@@ -394,6 +400,10 @@ function connect() {
         let msg;
         try { msg = JSON.parse(evt.data); } catch { return; }
 
+        if (msg.type === 'telemetry') {
+            const { devEui, name, rssi, battery, satellites } = msg.payload;
+            upsertDevice({ devEui, name, rssi, battery, satellites });
+        }
         if (msg.type === 'gps') {
             const { devEui, name, lat, lon, rssi, battery, satellites } = msg.payload;
             upsertDevice({ devEui, name, rssi, battery, satellites });
