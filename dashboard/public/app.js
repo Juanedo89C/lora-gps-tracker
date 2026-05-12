@@ -111,8 +111,11 @@ function upsertDevice(info) {
     deviceData[eui] = {
         device_eui: eui,
         name:       info.name || info.device_eui || eui,
-        power_mode: info.power_mode ?? deviceData[eui]?.power_mode ?? 2,
-        last_seen:  Math.floor(Date.now() / 1000),
+        power_mode: info.power_mode  ?? deviceData[eui]?.power_mode  ?? 2,
+        last_seen:  info.last_seen   ?? Math.floor(Date.now() / 1000),
+        battery:    info.battery     ?? deviceData[eui]?.battery     ?? 0,
+        satellites: info.satellites  ?? deviceData[eui]?.satellites  ?? 0,
+        rssi:       info.rssi        ?? deviceData[eui]?.rssi        ?? 0,
     };
     renderDevices();
 }
@@ -158,6 +161,38 @@ function renderModal() {
                 ${m[0].toUpperCase() + m.slice(1)}
             </button>
         `).join('');
+
+    // Telemetry
+    const teleEl = document.getElementById('modal-telemetry-grid');
+    let teleHtml = '';
+    const battery    = d.battery    || 0;
+    const satellites = d.satellites || 0;
+    const rssi       = d.rssi       || 0;
+
+    if (battery > 0) {
+        const vbat    = battery / 50.0;
+        const pct     = Math.max(0, Math.min(100, Math.round((vbat - 3.0) / (4.2 - 3.0) * 100)));
+        const barClr  = pct > 50 ? '#22c55e' : pct > 20 ? '#f59e0b' : '#ef4444';
+        teleHtml += `<div class="tele-row">
+            <div class="tele-label"><span>Battery</span><span class="tele-val">${vbat.toFixed(2)} V &middot; ${pct}%</span></div>
+            <div class="tele-bar-bg"><div class="tele-bar" style="width:${pct}%;background:${barClr}"></div></div>
+        </div>`;
+    }
+    if (satellites > 0) {
+        const satClr = satellites >= 4 ? '#22c55e' : satellites >= 2 ? '#f59e0b' : '#ef4444';
+        teleHtml += `<div class="tele-row">
+            <div class="tele-label"><span>Satellites</span><span class="tele-val" style="color:${satClr}">${satellites}</span></div>
+        </div>`;
+    }
+    if (rssi !== 0) {
+        const rssiPct = Math.max(0, Math.min(100, rssi + 150));
+        const rssiClr = rssiPct > 60 ? '#22c55e' : rssiPct > 30 ? '#f59e0b' : '#ef4444';
+        teleHtml += `<div class="tele-row">
+            <div class="tele-label"><span>RSSI</span><span class="tele-val">${rssi} dBm &middot; ${rssiPct}%</span></div>
+            <div class="tele-bar-bg"><div class="tele-bar" style="width:${rssiPct}%;background:${rssiClr}"></div></div>
+        </div>`;
+    }
+    teleEl.innerHTML = teleHtml || '<div style="color:#475569;font-size:.75rem">No telemetry yet.</div>';
 
     const lm   = lastMessages[devEui];
     const lmEl = document.getElementById('modal-last-msg');
@@ -312,8 +347,8 @@ function connect() {
         try { msg = JSON.parse(evt.data); } catch { return; }
 
         if (msg.type === 'gps') {
-            const { devEui, name, lat, lon } = msg.payload;
-            upsertDevice({ devEui, name });
+            const { devEui, name, lat, lon, rssi, battery, satellites } = msg.payload;
+            upsertDevice({ devEui, name, rssi, battery, satellites });
             addGpsPoint(devEui, lat, lon);
         }
         if (msg.type === 'message') {

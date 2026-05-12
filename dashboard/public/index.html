@@ -155,6 +155,14 @@
 
   .modal-future .section-title { color: #334155; }
 
+  /* Telemetry bars in modal */
+  .tele-row { display: flex; flex-direction: column; gap: 3px; margin-bottom: 7px; }
+  .tele-row:last-child { margin-bottom: 0; }
+  .tele-label { font-size: .7rem; color: #94a3b8; display: flex; justify-content: space-between; }
+  .tele-val { font-weight: 600; }
+  .tele-bar-bg { background: #0f172a; border-radius: 3px; height: 5px; overflow: hidden; }
+  .tele-bar { height: 100%; border-radius: 3px; transition: width .4s; }
+
   /* Scrollbar */
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -240,6 +248,11 @@
   <div class="modal-section">
     <div class="section-title">Power Mode</div>
     <div class="mode-btns" id="modal-mode-btns"></div>
+  </div>
+
+  <div class="modal-section">
+    <div class="section-title">Telemetry</div>
+    <div id="modal-telemetry-grid"></div>
   </div>
 
   <div class="modal-section">

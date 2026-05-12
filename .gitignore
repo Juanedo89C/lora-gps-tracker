@@ -12,3 +12,4 @@ find_*.py
 check_*.py
 restore_*.py
 deploy.py
+deploy_server.py

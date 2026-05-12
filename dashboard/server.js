@@ -39,9 +39,19 @@ db.exec(`
         device_eui TEXT    PRIMARY KEY,
         name       TEXT,
         power_mode INTEGER NOT NULL DEFAULT 2,
-        last_seen  INTEGER NOT NULL DEFAULT 0
+        last_seen  INTEGER NOT NULL DEFAULT 0,
+        battery    INTEGER NOT NULL DEFAULT 0,
+        satellites INTEGER NOT NULL DEFAULT 0,
+        rssi       INTEGER NOT NULL DEFAULT 0
     );
 `);
+
+// Migrate existing databases that are missing the new columns
+for (const col of ['battery INTEGER NOT NULL DEFAULT 0',
+                    'satellites INTEGER NOT NULL DEFAULT 0',
+                    'rssi INTEGER NOT NULL DEFAULT 0']) {
+    try { db.exec(`ALTER TABLE device_state ADD COLUMN ${col}`); } catch {}
+}
 
 // Prepared statements
 const stmtInsertGps = db.prepare(
@@ -60,6 +70,9 @@ const stmtUpsertDevice = db.prepare(`
 const stmtUpdateMode = db.prepare(
     'UPDATE device_state SET power_mode = ? WHERE device_eui = ?'
 );
+const stmtUpdateTelemetry = db.prepare(
+    'UPDATE device_state SET rssi = ?, battery = ?, satellites = ? WHERE device_eui = ?'
+);
 
 // ─── WebSocket broadcast ──────────────────────────────────────────────────────
 let wss;
@@ -72,18 +85,18 @@ function broadcast(type, payload) {
 }
 
 // ─── Payload decoder (mirrors firmware payload.cpp) ──────────────────────────
-// Firmware encodes: byte[0]=type, bytes[1-4]=lat*10000 int32BE,
-//                  bytes[5-8]=lon*10000 int32BE, bytes[9-10]=alt uint16BE,
-//                  byte[11]=powerMode, bytes[12+]=message utf8
+// v1: type(1)+lat(4)+lon(4)+alt(2)+mode(1)+msg(0-50)              = 12+ bytes
+// v2: type(1)+lat(4)+lon(4)+alt(2)+mode(1)+battery(1)+sats(1)+msg = 14+ bytes
 function decodePayload(base64data) {
     let buf;
     try { buf = Buffer.from(base64data, 'base64'); } catch { return null; }
     if (buf.length < 1) return null;
 
-    const type   = buf[0];
-    const hasGps = (type === 0x01 || type === 0x03);
-    const hasMsg = (type === 0x02 || type === 0x03);
-    const obj    = {};
+    const type     = buf[0];
+    const hasGps   = (type === 0x01 || type === 0x03);
+    const hasMsg   = (type === 0x02 || type === 0x03);
+    const isNewFmt = buf.length >= 14;
+    const obj      = {};
 
     if (hasGps && buf.length >= 11) {
         obj.latitude  = buf.readInt32BE(1) / 10000.0;
@@ -91,7 +104,12 @@ function decodePayload(base64data) {
         obj.altitude  = buf.readUInt16BE(9);
     }
     if (buf.length > 11) obj.powerMode = buf[11];
-    if (hasMsg && buf.length > 12) obj.message = buf.slice(12).toString('utf8');
+    if (isNewFmt) {
+        obj.battery    = buf[12];  // Vbat * 50; decode: voltage = val/50
+        obj.satellites = buf[13];
+    }
+    const msgOffset = isNewFmt ? 14 : 12;
+    if (hasMsg && buf.length > msgOffset) obj.message = buf.slice(msgOffset).toString('utf8');
 
     return obj;
 }
@@ -108,17 +126,22 @@ function handleUplink(topic, raw) {
     const obj = envelope.data ? decodePayload(envelope.data) : envelope.object;
     if (!obj) return;
 
-    const name = envelope?.deviceInfo?.deviceName || devEui;
+    const name       = envelope?.deviceInfo?.deviceName || devEui;
+    const rssi       = envelope?.rxInfo?.[0]?.rssi ?? 0;
+    const battery    = obj.battery    ?? 0;
+    const satellites = obj.satellites ?? 0;
+
     stmtUpsertDevice.run(devEui, name, 2);
+    stmtUpdateTelemetry.run(rssi, battery, satellites, devEui);
 
     // GPS data
     if (obj.latitude != null && obj.longitude != null) {
         const lat = obj.latitude;
         const lon = obj.longitude;
         const alt = obj.altitude || 0;
-        console.log(`[uplink] GPS ${devEui} lat=${lat} lon=${lon} alt=${alt}`);
+        console.log(`[uplink] GPS ${devEui} lat=${lat} lon=${lon} alt=${alt} rssi=${rssi} batt=${battery} sats=${satellites}`);
         stmtInsertGps.run(devEui, lat, lon, alt);
-        broadcast('gps', { devEui, name, lat, lon, alt, ts: Date.now() });
+        broadcast('gps', { devEui, name, lat, lon, alt, rssi, battery, satellites, ts: Date.now() });
     }
 
     // Text message
@@ -232,7 +255,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // List devices
 app.get('/api/devices', (_req, res) => {
     const rows = db.prepare(
-        'SELECT device_eui, name, power_mode, last_seen FROM device_state ORDER BY last_seen DESC'
+        'SELECT device_eui, name, power_mode, last_seen, battery, satellites, rssi FROM device_state ORDER BY last_seen DESC'
     ).all();
     res.json(rows);
 });
